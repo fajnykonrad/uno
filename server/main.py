@@ -7,31 +7,36 @@ from shared.protocol import (
     TYPE,
     DATA
 )
+from shared.utils import send_message, receive_messages
 
 HOST = '192.168.1.53'
 PORT = 8000
 clients = []
 
 def handle_client(conn, addr):
+    buffer = ""
     print(f"New connection from {addr}")
     while True:
         try:
-            data = conn.recv(1024).decode()
-            if not data:
-                break
+            messages, buffer = receive_messages(conn, buffer)
+            if not messages:
+                continue
 
-            msg = json.loads(data)
-            print("Received:", msg)
-            if msg[TYPE] == JOIN_REQUEST:
-                response = {
-                    TYPE : JOIN_ACCEPTED,
-                    DATA : {"message": "Welcome to the server!"}
+            for message in messages:
+                print("Received:", message)
+
+                if message[TYPE] == JOIN_REQUEST:
+                    response = {
+                        TYPE : JOIN_ACCEPTED,
+                        DATA : {"message": "Welcome to the server!"}
                 }
-                conn.sendall(json.dumps(response).encode())
+                send_message(conn, response)
+                
         except Exception as e:
             print(f"Error handling client {addr}: {e}")
-        conn.close()
-        print(f"Connection from {addr} closed.")
+            break
+    conn.close()
+    print(f"Connection from {addr} closed.")
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

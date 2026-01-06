@@ -6,6 +6,7 @@ from shared.protocol import (
     TYPE,
     DATA
 )
+from shared.utils import send_message, receive_messages
 
 SERVER_IP = input("Enter server IP address: ")
 SERVER_PORT = 8000
@@ -16,13 +17,18 @@ client.connect((SERVER_IP, SERVER_PORT))
 username = input("Enter your username: ")
 
 msg = {
-    'type': JOIN_REQUEST,
-    'data': {'username': username}
+    TYPE: JOIN_REQUEST,
+    DATA: {'username': username}
 }
 
-client.sendall(json.dumps(msg).encode())
+send_message(client, msg)
 
-response = client.recv(1024).decode()
+buffer = ""
+messages, buffer = receive_messages(client, buffer)
+
+for message in messages:
+    if message[TYPE] == JOIN_ACCEPTED:
+        response = message
 print("Response from server:", response)
 
 client.close()
