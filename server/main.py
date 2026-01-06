@@ -1,9 +1,14 @@
 import socket
 import threading
 import json
-from shared.protocol import JOIN_REQUEST, JOIN_ACCEPTED
+from shared.protocol import (
+    JOIN_REQUEST,
+    JOIN_ACCEPTED,
+    TYPE,
+    DATA
+)
 
-HOST = '0.0.0.0'
+HOST = '192.168.1.53'
 PORT = 8000
 clients = []
 
@@ -17,10 +22,10 @@ def handle_client(conn, addr):
 
             msg = json.loads(data)
             print("Received:", msg)
-            if msg['type'] == JOIN_REQUEST:
+            if msg[TYPE] == JOIN_REQUEST:
                 response = {
-                    'type' : JOIN_ACCEPTED,
-                    "data": {"message": "Welcome to the server!"}
+                    TYPE : JOIN_ACCEPTED,
+                    DATA : {"message": "Welcome to the server!"}
                 }
                 conn.sendall(json.dumps(response).encode())
         except Exception as e:

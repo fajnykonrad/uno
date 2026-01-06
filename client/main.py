@@ -1,6 +1,11 @@
 import socket
 import json
-from shared.protocol import JOIN_REQUEST, JOIN_ACCEPTED
+from shared.protocol import (
+    JOIN_REQUEST,
+    JOIN_ACCEPTED,
+    TYPE,
+    DATA
+)
 
 SERVER_IP = input("Enter server IP address: ")
 SERVER_PORT = 8000
