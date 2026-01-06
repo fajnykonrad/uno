@@ -3,6 +3,7 @@ import json
 from shared.protocol import (
     JOIN_REQUEST,
     JOIN_ACCEPTED,
+    LOBBY_UPDATE,
     TYPE,
     DATA
 )
@@ -24,11 +25,14 @@ msg = {
 send_message(client, msg)
 
 buffer = ""
-messages, buffer = receive_messages(client, buffer)
 
-for message in messages:
-    if message[TYPE] == JOIN_ACCEPTED:
-        response = message
-print("Response from server:", response)
+while True:
+    messages, buffer = receive_messages(client, buffer)
 
-client.close()
+    for message in messages:
+        if message[TYPE] == JOIN_ACCEPTED:
+            response = message
+            print("Response from server:", response)
+        if message[TYPE] == LOBBY_UPDATE:
+            players = message[DATA]['players']
+            print("Current players in lobby:")

@@ -15,7 +15,7 @@ Client → Server
 {
     type: JOIN_REQUEST
     data: {
-        nickname: str
+        username: str
     }
 }
 """
@@ -29,6 +29,22 @@ Server → Client
     data: {
         player_id: int,
         is_host: bool
+    }
+}
+"""
+
+LOBBY_UPDATE = "lobby_update"
+"""
+Server → Client
+{
+    type: LOBBY_UPDATE
+    data: {
+        players: [
+            {
+                username: str,
+                is_host: bool
+            }
+        ]
     }
 }
 """
