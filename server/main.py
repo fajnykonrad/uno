@@ -5,16 +5,30 @@ from shared.protocol import (
     JOIN_REQUEST,
     JOIN_ACCEPTED,
     LOBBY_UPDATE,
+    GAME_STATE,
+    START_GAME,
     TYPE,
     DATA
 )
 from shared.utils import send_message, receive_messages
 from server.lobby import Lobby
+from server.game import Game
 
 HOST = '192.168.1.53'
 PORT = 8000
 
 lobby = Lobby()
+game = None
+
+def lobbyUpdate():
+    """Send LOBBY_UPDATE to all connected players."""
+    data = lobby.get_lobby_data()
+    for p in lobby.players:
+        send_message(p.conn, {
+            TYPE: LOBBY_UPDATE,
+            DATA: data
+        })
+
 
 def handle_client(conn, addr):
     buffer = ""
@@ -42,8 +56,18 @@ def handle_client(conn, addr):
                     send_message(conn, response)
                     
                     #Update lobby for all players
-                    for p in lobby.players:
-                        lobbyUpdate()
+                    lobbyUpdate()
+                elif message[TYPE] == START_GAME:
+                    global game
+                    if not game:
+                        game = Game(lobby.players)
+                        # Initial game state
+                        for p in lobby.players:
+                            state = game.get_player_state(p)
+                            send_message(p.conn, {
+                                TYPE: GAME_STATE,
+                                DATA: state
+                            })
             
             
 
@@ -52,8 +76,7 @@ def handle_client(conn, addr):
     finally:
         if leavingPlayer:
             lobby.removePlayer(leavingPlayer.id)
-            for p in lobby.players:
-                lobbyUpdate()
+            lobbyUpdate()
         conn.close()
         print(f"Connection from {addr} closed.")
 
@@ -71,11 +94,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-def lobbyUpdate():
-    """Send LOBBY_UPDATE to all connected players."""
-    data = lobby.get_lobby_data()
-    for p in lobby.players:
-        send_message(p.conn, {
-            TYPE: LOBBY_UPDATE,
-            DATA: data
-        })
