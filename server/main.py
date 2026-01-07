@@ -19,6 +19,7 @@ PORT = 8000
 
 lobby = Lobby()
 game = None
+clients = []
 
 def lobbyUpdate():
     """Send LOBBY_UPDATE to all connected players."""
@@ -32,12 +33,12 @@ def lobbyUpdate():
 
 def handle_client(conn, addr):
     buffer = ""
-    leavingPlayer = None
+    player = None
     print(f"New connection from {addr}")
     try:
         while True:
             messages, buffer = receive_messages(conn, buffer)
-            if not messages:
+            if messages is None:
                 continue
 
             for message in messages:
@@ -51,7 +52,10 @@ def handle_client(conn, addr):
                     #Confirm join to player
                     response = {
                         TYPE : JOIN_ACCEPTED,
-                        DATA : {"message": "Welcome to the server!"}
+                        DATA : {
+                            'player_id': player.id,
+                            'is_host': (player.id == lobby.host_id)
+                        }
                     }
                     send_message(conn, response)
                     
@@ -74,9 +78,11 @@ def handle_client(conn, addr):
     except Exception as e:
         print(f"Client disconnected: {addr} - {e}")
     finally:
-        if leavingPlayer:
-            lobby.removePlayer(leavingPlayer.id)
+        if player:
+            lobby.removePlayer(player.id)
             lobbyUpdate()
+        if conn in clients:
+            clients.remove(conn)
         conn.close()
         print(f"Connection from {addr} closed.")
 
@@ -86,10 +92,19 @@ def main():
     server.listen()
     print(f"Server listening on {HOST}:{PORT}")
 
-    while True:
-        conn, addr = server.accept()
-        threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
-        print(f"Active connections: {threading.active_count() - 1}")
+    try:
+        while True:
+            conn, addr = server.accept()
+            clients.append(conn)
+            threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+            print(f"Active connections: {threading.active_count() - 1}")
+    except KeyboardInterrupt:
+        print("Shutting down server...")
+    finally:
+        for c in clients:
+            c.close()
+        server.close()
+        print("Server closed.")
 
 if __name__ == "__main__":
     main()

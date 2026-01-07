@@ -1,4 +1,7 @@
 import json
+import sys
+import termios
+import tty
 
 BUFFER_SIZE = 4096
 
@@ -23,3 +26,16 @@ def receive_messages(conn, buffer):
             messages.append(json.loads(line))
 
     return messages, buffer
+
+def get_key():
+    """Read single character keypress (blocking)."""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if ch == "\x1b":  # arrow keys start with ESC
+            ch += sys.stdin.read(2)  # read next 2 chars
+        return ch
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)

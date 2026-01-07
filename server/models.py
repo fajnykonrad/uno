@@ -6,12 +6,12 @@ VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
 WILD_CARDS = ["change", "+4"]
 
 class Player:
-    def __init__(self, conn, addr, nickname, player_id):
+    def __init__(self, conn, addr, username, player_id):
         self.conn = conn
         self.addr = addr
-        self.nickname = nickname
+        self.username = username
         self.id = player_id
-        
+
 class Card:
     def __init__(self, color, value):
         self.color = color  # can be None for Wild

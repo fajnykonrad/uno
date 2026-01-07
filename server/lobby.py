@@ -6,11 +6,11 @@ class Lobby:
         self.host_id = None
         self.next_player_id = 1
 
-    def addPlayer(self, conn, addr, nickname):
+    def addPlayer(self, conn, addr, username):
         player_id = self.next_player_id
         self.next_player_id += 1
 
-        player = Player(conn, addr, nickname, player_id)
+        player = Player(conn, addr, username, player_id)
         self.players.append(player)
 
         if len(self.players) == 1:
@@ -25,6 +25,6 @@ class Lobby:
 
     def get_lobby_data(self):
         return {
-            "players": [{"id": p.id, "nickname": p.nickname} for p in self.players],
+            "players": [{"id": p.id, "username": p.username} for p in self.players],
             "host_id": self.host_id
         }
