@@ -74,6 +74,11 @@ def receive_loop():
                         winner_id = msg[DATA]['winner_id']
                         winner = next((p['username'] for p in players if p['id'] == winner_id), "Unknown")
                         game_state = None
+                    elif msg[TYPE] == JOIN_REJECTED:
+                        console.clear()
+                        console.print("Cannot join lobby")
+                        exit = True
+                        return
         except socket.timeout:
             continue
         except Exception:
@@ -96,11 +101,15 @@ def render_loop():
                     top_text += f"Current Card:\n{print_card(c)}\n\n"
                 top_text += "Players:\n"
                 for p in players:
-                    host_marker = " (Host)" if p['id'] == host_id else ""
+                    you_marker = " (you)" if p['id'] == my_id else ""
                     turn_marker = ""
                     if game_state and p['id'] == game_state.get('current_turn'):
                         turn_marker = " <- Current Turn"
-                    top_text += f"- {p['username']}{host_marker}{turn_marker}\n"
+                        if game_state['direction'] == 1:
+                            turn_marker += " ↓"
+                        else:
+                            turn_marker += " ↑"
+                    top_text += f"- {p['username']}{you_marker}{turn_marker}\n"
                 panels.append(Panel(top_text.strip(), title="UNO Top Box"))
 
                 #MIDDLE
@@ -116,8 +125,10 @@ def render_loop():
                 bottom_text = ""
                 if not game_state:
                     bottom_text = "Waiting in lobby..."
-                    if is_host:
+                    if is_host and len(players) >= 2:
                         bottom_text += " Press ENTER to start the game."
+                    elif is_host:
+                        bottom_text += " Minimum 2 players to start."
                     bottom_text += "\n\n(q)uit"
                 else:
                     if game_state.get('current_turn') == my_id:
@@ -146,7 +157,7 @@ def input_loop():
         # Only allow host to start game when game_state is None
         if not game_state:
             key = get_key()
-            if is_host and key == ENTER:
+            if is_host and key == ENTER and len(players) >= 2:
                 send_message(client, {TYPE: START_GAME, DATA: {}})
             elif key is not None and key.lower() == 'q':
                 exit = True
@@ -182,11 +193,11 @@ def input_loop():
                     continue
                 if key in LEFT:
                     selected_index = (selected_index - 1) % len(game_state['your_hand'])
-                elif key in RIGHT:  # right
+                elif key in RIGHT:
                     selected_index = (selected_index + 1) % len(game_state['your_hand'])
-                elif key == ENTER:  # enter
+                elif key == ENTER:
                     card = game_state['your_hand'][selected_index]
-                    if card['color'] is None:  # wild card
+                    if card['color'] is None:  
                         color_select_mode = True
                     else:
                         send_message(client, {
@@ -205,12 +216,10 @@ def input_loop():
             time.sleep(0.1)
 
 
-# --- Start threads ---
 threading.Thread(target=receive_loop, daemon=True).start()
 threading.Thread(target=render_loop, daemon=True).start()
 threading.Thread(target=input_loop, daemon=True).start()
 
-# --- Keep main thread alive ---
 try:
     while not exit:
         time.sleep(1)

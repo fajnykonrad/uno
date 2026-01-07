@@ -45,6 +45,12 @@ def handle_client(conn, addr):
 
                 if message[TYPE] == JOIN_REQUEST:
                     # Add player to lobby
+                    if len(lobby.players) >= 4:
+                        send_message(conn, {
+                            TYPE: JOIN_REJECTED,
+                            DATA: "Lobby is full (max 4 players)."
+                        })
+                        continue
                     username = message[DATA]['username']
                     player = lobby.addPlayer(conn, addr, username)
                     

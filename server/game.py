@@ -128,5 +128,6 @@ class Game:
                 for p in self.players
             ],
             "your_hand": [c.to_dict() for c in player.hand],
-            "current_turn": self.current_player().id
+            "current_turn": self.current_player().id,
+            "direction": self.direction
         }

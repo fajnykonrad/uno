@@ -28,7 +28,16 @@ Server → Client
     }
 }
 """
-
+JOIN_REJECTED = "join_rejected"
+"""
+Server → Client
+{
+    type: JOIN_REJECTED
+    data: {
+        reason: str
+    }
+}
+"""
 DISCONNECT = "disconnect"
 """
 Client → Server
@@ -90,7 +99,8 @@ Server → Client
         your_hand: [
             {color: str or None, value: str}
         ],
-        current_turn: int  # player_id of current turn
+        current_turn: int  # player_id of current turn,
+        direction: int  # 1 down, -1 up
     }
 }
 """
