@@ -1,7 +1,6 @@
 import json
 import sys
-import termios
-import tty
+import os
 
 BUFFER_SIZE = 4096
 
@@ -27,15 +26,42 @@ def receive_messages(conn, buffer):
 
     return messages, buffer
 
-def get_key():
-    """Read single character keypress (blocking)."""
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        if ch == "\x1b":  # arrow keys start with ESC
-            ch += sys.stdin.read(2)  # read next 2 chars
+import os
+
+if os.name == "nt":
+    import msvcrt
+    def get_key():
+        if not msvcrt.kbhit():
+            return None
+
+        ch = msvcrt.getwch()
+
+        # Arrow keys come as two characters
+        if ch in ("\x00", "\xe0"):
+            ch2 = msvcrt.getwch()
+            return ch + ch2
+
         return ch
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+    LEFT = ("\x00K", "\xe0K")
+    RIGHT = ("\x00M", "\xe0M")
+    ENTER = "\r"  
+else:
+    import termios
+    import tty
+    import select
+
+    def get_key():
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            if not select.select([sys.stdin], [], [], 0.05)[0]:
+                return None
+            return sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    LEFT = "\x1b[D"
+    RIGHT = "\x1b[C"
+    ENTER = "\n"

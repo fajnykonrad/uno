@@ -1,16 +1,8 @@
 import socket
 import threading
 import json
-from shared.protocol import (
-    JOIN_REQUEST,
-    JOIN_ACCEPTED,
-    LOBBY_UPDATE,
-    GAME_STATE,
-    START_GAME,
-    TYPE,
-    DATA
-)
-from shared.utils import send_message, receive_messages
+from shared.protocol import *
+from shared.utils import *
 from server.lobby import Lobby
 from server.game import Game
 
@@ -29,7 +21,14 @@ def lobbyUpdate():
             TYPE: LOBBY_UPDATE,
             DATA: data
         })
-
+def gameUpdate():
+    """Send GAME_STATE to all connected players."""
+    for p in lobby.players:
+        state = game.get_player_state(p)
+        send_message(p.conn, {
+            TYPE: GAME_STATE,
+            DATA: state
+        })
 
 def handle_client(conn, addr):
     buffer = ""
@@ -66,14 +65,58 @@ def handle_client(conn, addr):
                     if not game:
                         game = Game(lobby.players)
                         # Initial game state
+                        gameUpdate()
+                elif message[TYPE] == PLAY_CARD and game:
+                    card_data = message[DATA]['card']
+                    chosen_color = message[DATA].get('chosen_color')
+
+                    player = next((p for p in lobby.players if p.conn == conn), None)
+                    card = next((c for c in player.hand if c.color == card_data['color'] and c.value == card_data['value']), None)
+
+                    if not card:
+                        print("Card not found in player's hand")
+                        send_message(conn, {
+                            TYPE: 'ERROR',
+                            DATA: "Card not found"
+                        })
+                        continue
+                    success, error = game.play_card(player, card, chosen_color)
+
+                    if not success:
+                        print("Error:", error)
+                        send_message(conn, {
+                            TYPE: INVALID_MOVE,
+                            DATA: {"reason": error}
+                        })
+                        continue
+                            
+                    gameUpdate()
+                    winner = game.check_winner()
+                    if winner:
                         for p in lobby.players:
-                            state = game.get_player_state(p)
                             send_message(p.conn, {
-                                TYPE: GAME_STATE,
-                                DATA: state
+                                TYPE: GAME_OVER,
+                                DATA: {"winner_id": winner.id, "winner_username": winner.username}
                             })
-            
-            
+                        
+                        game = None
+
+                        lobbyUpdate()
+                elif message[TYPE] == DRAW_CARD and game:
+                    success, error = game.draw_card(player)
+
+                    if not success:
+                        send_message(conn, {
+                            TYPE: INVALID_MOVE,
+                            DATA: {"reason": error}
+                        })
+                        continue
+
+                    gameUpdate()
+                elif message[TYPE] == DISCONNECT:
+                    lobby.removePlayer(player.id)
+                    lobbyUpdate()
+                    return
 
     except Exception as e:
         print(f"Client disconnected: {addr} - {e}")

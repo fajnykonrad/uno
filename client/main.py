@@ -8,6 +8,7 @@ from rich.console import Group
 
 from shared.protocol import *
 from shared.utils import *
+from shared.uimodels import *
 
 console = Console()
 
@@ -19,29 +20,35 @@ client.connect((SERVER_IP, SERVER_PORT))
 
 username = input("Enter your username: ")
 send_message(client, {TYPE: JOIN_REQUEST, DATA: {"username": username}})
-
+console.clear()
 # --- Shared state ---
 buffer = ""
 my_id = None
 is_host = False
 host_id = None
 players = []
-selected_card_index = 0
+selected_index = 0
 game_state = None
+error_message = None
+winner = None
 state_lock = threading.Lock()
+color_select_mode = False
+color_options = ['r','g','b','y']
+chosen_color = None
+exit = False
 
 COLORS = {
     "r": "red",
     "g": "green",
     "y": "yellow",
     "b": "blue",
-    "wild": "magenta"  # optional for wild cards
+    None: "magenta"  
 }
 
 # --- Receiver thread ---
 def receive_loop():
-    global buffer, my_id, is_host, host_id, players, game_state
-    while True:
+    global buffer, my_id, is_host, host_id, players, game_state, error_message, winner, selected_index, exit
+    while not exit:
         try:
             messages, buffer = receive_messages(client, buffer)
             for msg in messages:
@@ -55,22 +62,38 @@ def receive_loop():
                         is_host = (my_id == host_id)
                     elif msg[TYPE] == GAME_STATE:
                         game_state = msg[DATA]
+                        error_message = None
+                        if "your_hand" in game_state:
+                            if len(game_state['your_hand']) == 0:
+                                selected_index = 0
+                            else:
+                                selected_index = min(selected_index, len(game_state['your_hand']) - 1)
+                    elif msg[TYPE] == INVALID_MOVE:
+                        error_message = msg[DATA]['reason']
+                    elif msg[TYPE] == GAME_OVER:
+                        winner_id = msg[DATA]['winner_id']
+                        winner = next((p['username'] for p in players if p['id'] == winner_id), "Unknown")
+                        game_state = None
+        except socket.timeout:
+            continue
         except Exception:
-            console.print("[red]Disconnected from server[/red]")
+            if not exit:
+                console.print(f"[red]Disconnected from server: {e}[/red]")
             break
 
 # --- Renderer thread ---
 def render_loop():
+    global exit
     with Live(console=console, refresh_per_second=10, screen=False) as live:
-        while True:
+        while not exit:
             with state_lock:
                 panels = []
 
-                # --- Top Box: Current card + players ---
+                #TOP
                 top_text = ""
                 if game_state and "current_card" in game_state:
                     c = game_state['current_card']
-                    top_text += f"Current Card: [{COLORS.get(c['color'],'white')}]{c['value']}[/{COLORS.get(c['color'],'white')}]\n"
+                    top_text += f"Current Card:\n{print_card(c)}\n\n"
                 top_text += "Players:\n"
                 for p in players:
                     host_marker = " (Host)" if p['id'] == host_id else ""
@@ -80,49 +103,106 @@ def render_loop():
                     top_text += f"- {p['username']}{host_marker}{turn_marker}\n"
                 panels.append(Panel(top_text.strip(), title="UNO Top Box"))
 
-                # --- Middle Box: Your Hand ---
+                #MIDDLE
                 middle_text = ""
                 if game_state and "your_hand" in game_state:
-                    for card in game_state['your_hand']:
-                        middle_text += f"[{COLORS.get(card['color'], 'white')}]{card['value']}[/{COLORS.get(card['color'], 'white')}]  "
+                    middle_text += print_hand(game_state['your_hand'], selected_index)
+
+                elif winner is not None:
+                    middle_text = f"[green]Game Over! Winner: {winner}[/]"
                 panels.append(Panel(middle_text.strip() or "Waiting for cards...", title="Your Hand"))
 
-                # --- Bottom Box: Controls / Notifications ---
+                #BOTTOM
                 bottom_text = ""
                 if not game_state:
                     bottom_text = "Waiting in lobby..."
                     if is_host:
                         bottom_text += " Press ENTER to start the game."
+                    bottom_text += "\n\n(q)uit"
                 else:
                     if game_state.get('current_turn') == my_id:
-                        bottom_text = "Your turn! (Later: arrow keys to select, ENTER to play)"
+                        if color_select_mode:
+                            bottom_text = "Choose color: [red](r)ed[/], [green](g)reen[/], [blue](b)lue[/], [yellow](y)ellow[/]"
+                            if error_message:
+                                bottom_text += f"\n[red]Error: {error_message}[/red]"
+                        else:
+                            bottom_text = "← → select | ENTER play | D draw"
+                            if error_message:
+                                bottom_text += f"\n[red]Error: {error_message}[/red]"
                     else:
                         current_player = next((p['username'] for p in players if p['id']==game_state.get('current_turn')), "-")
                         bottom_text = f"{current_player}'s turn..."
                 panels.append(Panel(bottom_text, title="Controls"))
 
-                # --- Update Live without flicker ---
+                #UPDATE
                 live.update(Group(*panels))
 
             time.sleep(0.2)
 
 # --- Input thread ---
 def input_loop():
-    global game_state
-    while True:
+    global game_state, selected_index, color_select_mode, chosen_color, exit
+    while not exit:
         # Only allow host to start game when game_state is None
-        if is_host and not game_state:
+        if not game_state:
             key = get_key()
-            if key == '\r':
+            if is_host and key == ENTER:
                 send_message(client, {TYPE: START_GAME, DATA: {}})
+            elif key is not None and key.lower() == 'q':
+                exit = True
+                try:
+                    send_message(client, {TYPE: DISCONNECT, DATA: {}})
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
+                except Exception:
+                    pass
+                break
         elif game_state and game_state.get('current_turn') == my_id:
             if not game_state.get('your_hand'):
                 continue
             key = get_key()
-            if key == "\x1b[D":  # left
-                selected_index = (selected_index - 1) % len(game_state['your_hand'])
-            elif key == "\x1b[C":  # right
-                selected_index = (selected_index + 1) % len(game_state['your_hand'])
+            if color_select_mode:
+                if key is None:
+                    continue
+                if key.lower() in color_options:
+                    chosen_color = key.lower()
+                    card = game_state['your_hand'][selected_index]
+                    send_message(client, {
+                        TYPE: PLAY_CARD,
+                        DATA: {
+                            "card": card,
+                            "chosen_color": chosen_color
+                        }
+                    })
+
+                    color_select_mode = False
+                    chosen_color = None
+            else:
+                if key is None:
+                    continue
+                if key in LEFT:
+                    selected_index = (selected_index - 1) % len(game_state['your_hand'])
+                elif key in RIGHT:  # right
+                    selected_index = (selected_index + 1) % len(game_state['your_hand'])
+                elif key == ENTER:  # enter
+                    card = game_state['your_hand'][selected_index]
+                    if card['color'] is None:  # wild card
+                        color_select_mode = True
+                    else:
+                        send_message(client, {
+                            TYPE: PLAY_CARD,
+                            DATA: {
+                                "card": card,
+                                "chosen_color": None
+                            }
+                        })
+                elif key.lower() == 'd':
+                    send_message(client, {
+                        TYPE: DRAW_CARD,
+                        DATA: {}
+                    })
+        else:
+            time.sleep(0.1)
 
 
 # --- Start threads ---
@@ -132,7 +212,16 @@ threading.Thread(target=input_loop, daemon=True).start()
 
 # --- Keep main thread alive ---
 try:
-    while True:
+    while not exit:
         time.sleep(1)
 except KeyboardInterrupt:
+    exit = True
     client.close()
+    try:
+        client.shutdown(socket.SHUT_RDWR)
+        client.close()
+    except Exception:
+        pass
+finally:
+    console.clear()
+    console.print("[green]Disconnected. Goodbye![/green]")

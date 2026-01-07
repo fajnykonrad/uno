@@ -29,11 +29,11 @@ Server → Client
 }
 """
 
-PLAYER_LEFT = "player_left"
+DISCONNECT = "disconnect"
 """
 Client → Server
 {
-    type: PLAYER_LEFT
+    type: DISCONNECT
     data: {}
 }
 """
@@ -127,33 +127,6 @@ Server → Client
 }
 """
 
-####################
-# Turn & Effects   #
-####################
-
-TURN_UPDATE = "turn_update"
-"""
-Server → Client
-{
-    type: TURN_UPDATE
-    data: {
-        current_turn: int  # player_id whose turn it is
-    }
-}
-"""
-
-CARD_PLAYED = "card_played"
-"""
-Server → Client
-{
-    type: CARD_PLAYED
-    data: {
-        player_id: int,
-        card: {color: str or None, value: str},
-        chosen_color: str or None  # if wild
-    }
-}
-"""
 
 ####################
 # Game End         #
@@ -166,7 +139,7 @@ Server → Client
     type: GAME_OVER
     data: {
         winner_id: int,
-        winner_name: str
+        winner_username: str
     }
 }
 """
