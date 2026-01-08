@@ -12,7 +12,7 @@ from shared.uimodels import *
 
 console = Console()
 
-# --- Connect to server ---
+# Connexió al servidor
 SERVER_IP = input("Server IP: ")
 SERVER_PORT = 8000
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,9 +21,9 @@ client.connect((SERVER_IP, SERVER_PORT))
 username = input("Enter your username: ")
 send_message(client, {TYPE: JOIN_REQUEST, DATA: {"username": username}})
 console.clear()
-# --- Shared state ---
+# Variables globals
 buffer = ""
-my_id = None
+my_id = None 
 is_host = False
 host_id = None
 players = []
@@ -45,8 +45,8 @@ COLORS = {
     None: "magenta"  
 }
 
-# --- Receiver thread ---
-def receive_loop():
+#MISSATGES DEL SERVIDOR
+def receiver():
     global buffer, my_id, is_host, host_id, players, game_state, error_message, winner, selected_index, exit
     while not exit:
         try:
@@ -86,8 +86,8 @@ def receive_loop():
                 console.print(f"[red]Disconnected from server: {e}[/red]")
             break
 
-# --- Renderer thread ---
-def render_loop():
+# GRAFICA 
+def graphics():
     global exit
     with Live(console=console, refresh_per_second=10, screen=False) as live:
         while not exit:
@@ -150,8 +150,8 @@ def render_loop():
 
             time.sleep(0.2)
 
-# --- Input thread ---
-def input_loop():
+#INPUT I TRANSMISSIÓ A SERVIDOR
+def input():
     global game_state, selected_index, color_select_mode, chosen_color, exit
     while not exit:
         # Only allow host to start game when game_state is None
@@ -216,9 +216,9 @@ def input_loop():
             time.sleep(0.1)
 
 
-threading.Thread(target=receive_loop, daemon=True).start()
-threading.Thread(target=render_loop, daemon=True).start()
-threading.Thread(target=input_loop, daemon=True).start()
+threading.Thread(target=receiver, daemon=True).start()
+threading.Thread(target=graphics, daemon=True).start()
+threading.Thread(target=input, daemon=True).start()
 
 try:
     while not exit:

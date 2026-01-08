@@ -14,7 +14,7 @@ class Player:
 
 class Card:
     def __init__(self, color, value):
-        self.color = color  # can be None for Wild
+        self.color = color  # Pot ser nul
         self.value = value
 
     def to_dict(self):
@@ -24,9 +24,9 @@ class Deck():
     def __init__(self):
         self.cards = []
         for color in COLORS:
-            self.cards.append(Card(color, "0"))  # one zero per color
+            self.cards.append(Card(color, "0"))
             for v in VALUES[1:]:
-                self.cards.extend([Card(color, v), Card(color, v)])  # 2 of each
+                self.cards.extend([Card(color, v), Card(color, v)])
         for _ in range(4):
             for wild in WILD_CARDS:
                 self.cards.append(Card(None, wild))

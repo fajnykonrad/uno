@@ -13,10 +13,10 @@ class Game:
         for p in self.players:
             p.hand = self.deck.draw(7)
 
-        # Pick first card for discard pile (must not be wild draw 4)
+        # Primera carta al descarte
         while True:
             card = self.deck.draw()[0]
-            if card.value not in ["Wild Draw Four", "Wild"]:
+            if card.value not in ["change", "+4"]:
                 self.discard_pile.append(card)
                 break
             else:
@@ -43,6 +43,7 @@ class Game:
             card.value == top.value
         )
 
+    # Aplicació efectes cartes
     def apply_card_effect(self, card, chosen_color):
         if card.color is None:
             card.color = chosen_color
@@ -118,7 +119,6 @@ class Game:
     ## Game State ##
     ################    
     def get_player_state(self, player):
-        """Return game state for a specific player"""
         return {
             "current_card": self.discard_pile[-1].to_dict(),
             "players": [

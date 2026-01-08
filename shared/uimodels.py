@@ -343,6 +343,7 @@ def print_card (card):
     for line in CARD_ART[card['value']]:
         output += f"[{COLORS[card['color']]}]{line}[/]\n"
     return output
+
 def print_hand (hand, selected_index=None):
     output_lines = [""] * 9
     for card in hand:

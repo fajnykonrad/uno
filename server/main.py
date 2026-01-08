@@ -6,7 +6,7 @@ from shared.utils import *
 from server.lobby import Lobby
 from server.game import Game
 
-HOST = '192.168.1.53'
+HOST = socket.gethostbyname(socket.gethostname())
 PORT = 8000
 
 lobby = Lobby()
@@ -14,7 +14,7 @@ game = None
 clients = []
 
 def lobbyUpdate():
-    """Send LOBBY_UPDATE to all connected players."""
+    """Update de lobby a tots els jugadors connectats."""
     data = lobby.get_lobby_data()
     for p in lobby.players:
         send_message(p.conn, {
@@ -22,7 +22,7 @@ def lobbyUpdate():
             DATA: data
         })
 def gameUpdate():
-    """Send GAME_STATE to all connected players."""
+    """Update de l'estat del joc a tots els jugadors connectats."""
     for p in lobby.players:
         state = game.get_player_state(p)
         send_message(p.conn, {
@@ -30,6 +30,7 @@ def gameUpdate():
             DATA: state
         })
 
+#Client thread
 def handle_client(conn, addr):
     buffer = ""
     player = None
@@ -41,7 +42,6 @@ def handle_client(conn, addr):
                 continue
 
             for message in messages:
-                print("Received:", message)
 
                 if message[TYPE] == JOIN_REQUEST:
                     # Add player to lobby
@@ -64,13 +64,11 @@ def handle_client(conn, addr):
                     }
                     send_message(conn, response)
                     
-                    #Update lobby for all players
                     lobbyUpdate()
                 elif message[TYPE] == START_GAME:
                     global game
                     if not game:
                         game = Game(lobby.players)
-                        # Initial game state
                         gameUpdate()
                 elif message[TYPE] == PLAY_CARD and game:
                     card_data = message[DATA]['card']

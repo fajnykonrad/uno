@@ -26,6 +26,10 @@ def receive_messages(conn, buffer):
 
     return messages, buffer
 
+
+#########################
+## Input crossplatform ##       NO FUNCIONA :(
+#########################
 import os
 
 if os.name == "nt":
