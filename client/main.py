@@ -155,7 +155,6 @@ def graphics():
 def inputloop():
     global game_state, selected_index, color_select_mode, chosen_color, exitf
     while not exitf:
-        # Only allow host to start game when game_state is None
         if not game_state:
             key = get_key()
             if is_host and key == KEY_ENTER and len(players) >= 2:

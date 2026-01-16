@@ -7,13 +7,11 @@ import select
 BUFFER_SIZE = 4096
 
 def send_message(conn, message):
-    # Nova linia per delimitar missatges
     data = json.dumps(message) + "\n"
     conn.sendall(data.encode())
 
 
 def receive_messages(conn, buffer):
-    #Llegeix dades del socket i les descompon en missatges JSON
     data = conn.recv(BUFFER_SIZE).decode()
     if not data:
         return [], buffer
@@ -28,9 +26,6 @@ def receive_messages(conn, buffer):
 
     return messages, buffer
 
-# =========================
-# Cross-platform input
-# =========================
 
 KEY_LEFT = "LEFT"
 KEY_RIGHT = "RIGHT"
@@ -59,7 +54,6 @@ if os.name == "nt":
         return ch.lower()
 
 else:
-    # -------- Linux / macOS --------
     import termios
     import tty
 
@@ -77,7 +71,6 @@ else:
     
     def disable_input():
         _restore_terminal()
-    # Enable raw input ONCE
 
     _enable_raw()
     atexit.register(_restore_terminal)
