@@ -21,6 +21,7 @@ client.connect((SERVER_IP, SERVER_PORT))
 username = input("Enter your username: ")
 send_message(client, {TYPE: JOIN_REQUEST, DATA: {"username": username}})
 console.clear()
+
 # Variables globals
 buffer = ""
 my_id = None 
@@ -35,7 +36,7 @@ state_lock = threading.Lock()
 color_select_mode = False
 color_options = ['r','g','b','y']
 chosen_color = None
-exit = False
+exitf = False
 
 COLORS = {
     "r": "red",
@@ -47,8 +48,8 @@ COLORS = {
 
 #MISSATGES DEL SERVIDOR
 def receiver():
-    global buffer, my_id, is_host, host_id, players, game_state, error_message, winner, selected_index, exit
-    while not exit:
+    global buffer, my_id, is_host, host_id, players, game_state, error_message, winner, selected_index, exitf
+    while not exitf:
         try:
             messages, buffer = receive_messages(client, buffer)
             for msg in messages:
@@ -77,20 +78,20 @@ def receiver():
                     elif msg[TYPE] == JOIN_REJECTED:
                         console.clear()
                         console.print("Cannot join lobby")
-                        exit = True
+                        exitf = True
                         return
         except socket.timeout:
             continue
         except Exception:
-            if not exit:
+            if not exitf:
                 console.print(f"[red]Disconnected from server: {e}[/red]")
             break
 
 # GRAFICA 
 def graphics():
-    global exit
-    with Live(console=console, refresh_per_second=10, screen=False) as live:
-        while not exit:
+    global exitf
+    with Live(console=console, refresh_per_second=10, screen = True) as live:
+        while not exitf:
             with state_lock:
                 panels = []
 
@@ -151,16 +152,16 @@ def graphics():
             time.sleep(0.2)
 
 #INPUT I TRANSMISSIÓ A SERVIDOR
-def input():
-    global game_state, selected_index, color_select_mode, chosen_color, exit
-    while not exit:
+def inputloop():
+    global game_state, selected_index, color_select_mode, chosen_color, exitf
+    while not exitf:
         # Only allow host to start game when game_state is None
         if not game_state:
             key = get_key()
-            if is_host and key == ENTER and len(players) >= 2:
+            if is_host and key == KEY_ENTER and len(players) >= 2:
                 send_message(client, {TYPE: START_GAME, DATA: {}})
-            elif key is not None and key.lower() == 'q':
-                exit = True
+            elif key is not None and key == 'q':
+                exitf = True
                 try:
                     send_message(client, {TYPE: DISCONNECT, DATA: {}})
                     client.shutdown(socket.SHUT_RDWR)
@@ -174,8 +175,9 @@ def input():
             key = get_key()
             if color_select_mode:
                 if key is None:
+                    time.sleep(0.02)
                     continue
-                if key.lower() in color_options:
+                if key in color_options:
                     chosen_color = key.lower()
                     card = game_state['your_hand'][selected_index]
                     send_message(client, {
@@ -191,13 +193,13 @@ def input():
             else:
                 if key is None:
                     continue
-                if key in LEFT:
+                if key == KEY_LEFT:
                     selected_index = (selected_index - 1) % len(game_state['your_hand'])
-                elif key in RIGHT:
+                elif key == KEY_RIGHT:
                     selected_index = (selected_index + 1) % len(game_state['your_hand'])
-                elif key == ENTER:
+                elif key == KEY_ENTER:
                     card = game_state['your_hand'][selected_index]
-                    if card['color'] is None:  
+                    if card['color'] is None:
                         color_select_mode = True
                     else:
                         send_message(client, {
@@ -207,7 +209,7 @@ def input():
                                 "chosen_color": None
                             }
                         })
-                elif key.lower() == 'd':
+                elif key == 'd':
                     send_message(client, {
                         TYPE: DRAW_CARD,
                         DATA: {}
@@ -218,13 +220,13 @@ def input():
 
 threading.Thread(target=receiver, daemon=True).start()
 threading.Thread(target=graphics, daemon=True).start()
-threading.Thread(target=input, daemon=True).start()
+threading.Thread(target=inputloop, daemon=True).start()
 
 try:
-    while not exit:
+    while not exitf:
         time.sleep(1)
 except KeyboardInterrupt:
-    exit = True
+    exitf = True
     client.close()
     try:
         client.shutdown(socket.SHUT_RDWR)

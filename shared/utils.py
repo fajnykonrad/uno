@@ -1,6 +1,8 @@
 import json
 import sys
 import os
+import atexit
+import select
 
 BUFFER_SIZE = 4096
 
@@ -26,46 +28,77 @@ def receive_messages(conn, buffer):
 
     return messages, buffer
 
+# =========================
+# Cross-platform input
+# =========================
 
-#########################
-## Input crossplatform ##       NO FUNCIONA :(
-#########################
-import os
+KEY_LEFT = "LEFT"
+KEY_RIGHT = "RIGHT"
+KEY_ENTER = "ENTER"
 
 if os.name == "nt":
     import msvcrt
+
     def get_key():
         if not msvcrt.kbhit():
             return None
 
         ch = msvcrt.getwch()
 
-        # Arrow keys come as two characters
-        if ch in ("\x00", "\xe0"):
+        if ch in ("\x00", "\xe0"):  # Special key
             ch2 = msvcrt.getwch()
-            return ch + ch2
+            if ch2 == "K":
+                return KEY_LEFT
+            elif ch2 == "M":
+                return KEY_RIGHT
+            return None
 
-        return ch
+        if ch == "\r":
+            return KEY_ENTER
 
-    LEFT = ("\x00K", "\xe0K")
-    RIGHT = ("\x00M", "\xe0M")
-    ENTER = "\r"  
+        return ch.lower()
+
 else:
+    # -------- Linux / macOS --------
     import termios
     import tty
-    import select
+
+    fd = sys.stdin.fileno()
+    _orig_termios = termios.tcgetattr(fd)
+
+    def _enable_raw():
+        tty.setcbreak(fd)
+
+    def _restore_terminal():
+        termios.tcsetattr(fd, termios.TCSADRAIN, _orig_termios)
+    
+    def enable_input():
+        _enable_raw()
+    
+    def disable_input():
+        _restore_terminal()
+    # Enable raw input ONCE
+
+    _enable_raw()
+    atexit.register(_restore_terminal)
+    
+    ESCAPE_MAP = {
+        "\x1b[D": KEY_LEFT,
+        "\x1b[C": KEY_RIGHT,
+    }
 
     def get_key():
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            if not select.select([sys.stdin], [], [], 0.05)[0]:
-                return None
-            return sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        if not select.select([sys.stdin], [], [], 0)[0]:
+            return None
 
-    LEFT = "\x1b[D"
-    RIGHT = "\x1b[C"
-    ENTER = "\n"
+        ch = sys.stdin.read(1)
+
+        if ch == "\x1b":
+            ch += sys.stdin.read(2)
+            return ESCAPE_MAP.get(ch)
+
+        if ch in ("\n", "\r"):
+            return KEY_ENTER
+
+        return ch.lower()
+    
